@@ -25,14 +25,11 @@ set.seed(123)
 #https://docs.google.com/spreadsheets/d/1eKXHuNRyOunGhbV3JVG3KVbKmMIYe6x5SBsBwPbyZNk/edit?usp=sharing
 
 cervical <- read.csv("cervical.csv")
-cervical[1] <- NULL
-colnames(cervical) <- NA
-data <- cervical
+str(cervical, max.level = 0)
+data <- cervical # shorter name to work with later
 
-col_names = read_csv('cervical1.csv')  # file contains id and miRNA names
+col_names <- cervical[1]
 str(col_names) # I like to do a lot of structure checks
-col_names[1] <- NULL # drop the id column
-str(col_names)
 col_names1 <- as.matrix(col_names)
 #Substitute letters for the *'s and-'s
 col_names2 <- as.matrix(str_replace_all(col_names1, pattern = fixed("*"), "x"))
@@ -47,7 +44,7 @@ colnames(nams) <-col_names3 #Installs the column names
 #data <- data[-1,]    # remove dx (diagnosis) row
 
 # Remove the numerics from the index and dependent variable (dx)
-data_nums <- data
+data_nums <- data[-1]
 # Put the numerics in a data matrix (not a matrix, need
 #to preserve columnar structure)
 data_nums_mat <- data.matrix(data_nums)
@@ -248,36 +245,27 @@ cm
 
 
 
-
-
-
-
-
-
-
 # ****** XGBoost *******************
 library(xgboost)
 # data_nums_mat_tr_df
 # xgboost does not require scaled data
 #colnames(ca_xgb[1]) <- as.matrix('dx')
-data_nums_mat_tr_df$dx <- dx 
-data_nums_mat_tr_df$dx <- factor(as.character(data_nums_mat_tr_df$dx))
+dx_num <- c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+            1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)
+class(dx_num)
+dx_chr <- ifelse(dx_num == 0,"normal", "tumor")
+dx_fac <- factor(dx_chr,levels = c("normal", "tumor"))
+str(dx_fac)
+str(data_nums_mat_tr_df, max.level = 0)
+data_nums_mat_tr_df$dx <- dx_fac  
+#data_nums_mat_tr_df$dx <- factor(as.character(data_nums_mat_tr_df$dx), levels = c("normal", "tumor"))
 inTrain <- createDataPartition(data_nums_mat_tr_df$dx, p = 0.75, list = FALSE)
 train <- data_nums_mat_tr_df[inTrain,]
+#train$dx <- dx  # add dx column to train
 test <- data_nums_mat_tr_df[-inTrain,] 
+#train <- as.matrix(train)
+dim(train)
 
-m_xgb <- xgboost(data.matrix(data_nums_mat_tr_df[-1]), label = data_nums_mat_tr_df$dx, nrounds = 40)
-y_pred = data.frame(predict(m_xgb, newdata = data.matrix(test)))
-dx <- data.frame(unlist(test$X1))
-# Making the Confusion Matrix
-test_dx_df <- data_frame(test$dx)
-cm <- confusionMatrix(y_pred, test_dx_df)
-cm
-#*************************************************
-data.frame(trai)->mydat
-
-train$dx <- factor(train$dx)
-str(train[1])
 xgbGrid <- expand.grid(nrounds = c(1, 10),
                        max_depth = c(1, 4),
                        eta = c(.1, .4),
@@ -286,15 +274,24 @@ xgbGrid <- expand.grid(nrounds = c(1, 10),
                        min_child_weight = 1,
                        subsample = c(.8, 1))
 
-cctrl2 <- trainControl(method = "LOOCV",
-                       classProbs = TRUE, summaryFunction = twoClassSummary)
+ctrl1 <- trainControl(method = "LOOCV",
+                      classProbs = TRUE,
+                      summaryFunction = twoClassSummary)
+m_xgb <- train(dx ~ ., data = train, 
+                     method = "xgbTree", 
+                     trControl = ctrl1,
+                     metric = "ROC", 
+                     #preProc = c("center", "scale")
+                     tuneGrid = xgbGrid)
 
-ca_xgb <- train(dx ~ ., data = train, 
-                            method = "xgbTree", 
-                            trControl = cctrl2,
-                            metric = "ROC", 
-                            preProc = c("center", "scale"),
-                            tuneGrid = xgbGrid)
+y_pred = data.frame(predict(m_xgb, newdata = data.matrix(test)))
+dx <- data.frame(unlist(test$X1))
+# Making the Confusion Matrix
+test_dx_df <- data_frame(test$dx)
+cm <- confusionMatrix(y_pred, test_dx_df)
+cm
+#*************************************************
+
 
 eval <- function(x) {
   a <- is.matrix(x)

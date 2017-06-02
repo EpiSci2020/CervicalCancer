@@ -170,28 +170,6 @@ for (i in 1:714) {
 
 
 #***** Prediction  *************************************
-#****** Split the data   *******
-inTrain <- createDataPartition(cancer$dx, p = 0.75, list = FALSE)
-trains <- cancer[inTrain,]
-tests <- cancer[-inTrain,]
-# factorize dx - for gbm model
-trains$dx <- factor(trains$dx, labels = c("normal", "tumor"))
-tests$dx <- factor(tests$dx, labels = c("normal", "tumor"))
-
-# ***** Create models  (using caret)******
-# I picked a gradient boosted algorithm - gbm
-fitControl <-trainControl(method = "cv", number = 3, returnResamp = "none",
-                       classProbs = TRUE,
-                       verboseIter = FALSE,
-                       summaryFunction = twoClassSummary)
-model <- train(dx~., data = trains,
-               trControl = fitControl,
-               method = "gbm",
-               metric = "ROC")
-
-preds <- predict(model,tests[,-624], type = "raw")              
-confusionMatrix(preds,tests$dx)
-
 
 #***********  PCA Model **********************************************************
 
